@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring-app
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/alija-globaly/argocd-practice.git
+    targetRevision: "main"
+    path: custom-values
+    helm:
+      chart: grafana              # Helm chart name
+      repoURL: https://grafana.github.io/helm-charts
+      valueFiles:
+        - grafana-custom-values.yaml   # relative path inside Git repo
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: test
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+      - ServerSideApply=true

@@ -1,0 +1,7 @@
+kubectl cluster-info
+kubectl config view
+
+kubectl config get-contexts
+kubectl patch svc argocd-server -n argocd -p '{"spec":{"type":"NodePort"}}'
+
+argocd admin initial-password -n argocd
