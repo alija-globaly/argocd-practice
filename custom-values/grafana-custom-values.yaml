@@ -52,7 +52,7 @@ ingress:
 
 # Persistence
 persistence:
-  enabled: true
+  enabled: false
   type: pvc
   storageClassName: ""  
   accessModes:
