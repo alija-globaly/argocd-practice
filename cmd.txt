@@ -4,4 +4,5 @@ kubectl config view
 kubectl config get-contexts
 kubectl patch svc argocd-server -n argocd -p '{"spec":{"type":"NodePort"}}'
 
-argocd admin initial-password -n argocd
+argocd admin initial-password -n argocd 
+BzdY6c38YCncZTxl
