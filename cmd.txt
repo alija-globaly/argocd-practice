@@ -6,3 +6,5 @@ kubectl patch svc argocd-server -n argocd -p '{"spec":{"type":"NodePort"}}'
 
 argocd admin initial-password -n argocd 
 BzdY6c38YCncZTxl
+
+kubectl get sa awscli -n monitoring -o yaml
