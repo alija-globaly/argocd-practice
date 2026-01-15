@@ -55,6 +55,8 @@ serviceAccount:
   create: false      # we created it manually
   name: awscli    
 
+memberlist:
+  joinMembers: [] 
 
 write:
   extraEnv:
