@@ -2,9 +2,6 @@
 nameOverride: ""
 fullnameOverride: ""
 
-# ============================================================================
-# Prometheus Server Configuration
-# ============================================================================
 prometheus:
   enabled: true
   
@@ -57,23 +54,17 @@ prometheus:
     replicas: 1
     affinity: {}
     # affinity:
-    #   podAntiAffinity:
-    #     preferredDuringSchedulingIgnoredDuringExecution:
-    #       - weight: 100
-    #         podAffinityTerm:
-    #           labelSelector:
-    #             matchExpressions:
-    #               - key: app.kubernetes.io/name
-    #                 operator: In
-    #                 values:
-    #                   - prometheus
-    #           topologyKey: kubernetes.io/hostname
+        # podAntiAffinity:
+        #   preferredDuringSchedulingIgnoredDuringExecution:
+        #     - weight: 100
+        #       podAffinityTerm:
+        #         topologyKey: kubernetes.io/hostname
+        #         labelSelector:
+        #           matchLabels:
+        #             app.kubernetes.io/name: prometheus
 
     
-    # Remote Write - Send to long-term storage (optional)
     remoteWrite: []
-
-    # Additional Scrape Configs
     additionalScrapeConfigs: []
 
     # Pod Security
@@ -104,9 +95,6 @@ prometheus:
   ingress:
     enabled: false
 
-# ============================================================================
-# Alertmanager Configuration (High Availability)
-# ============================================================================
 alertmanager:
   enabled: false
   
@@ -157,33 +145,21 @@ alertmanager:
       
     # Route Configuration
     route:
-      group_by: ['namespace']
+      receiver: 'null'
       group_wait: 30s
       group_interval: 5m
       repeat_interval: 12h
-      receiver: 'null'
-      routes:
-      - receiver: 'null'
-        matchers:
-          - alertname = "Watchdog"
-  
-    # Receivers
+
     receivers:
-    - name: 'null'
+      - name: 'null'
   
   # Ingress
   ingress:
     enabled: false
 
-# ============================================================================
-# Grafana
-# ============================================================================
 grafana:
   enabled: false
 
-# ============================================================================
-# Node Exporter
-# ============================================================================
 nodeExporter:
   enabled: true
   resources:
@@ -194,9 +170,6 @@ nodeExporter:
       cpu: 100m
       memory: 100Mi
 
-# ============================================================================
-# Kube State Metrics
-# ============================================================================
 
 kubeStateMetrics:
   enabled: true
@@ -214,9 +187,7 @@ kube-state-metrics:
       cpu: 100m
       memory: 100Mi
 
-# ============================================================================
-# Prometheus Operator
-# ============================================================================
+
 prometheusOperator:
   enabled: true
   resources:
@@ -228,18 +199,13 @@ prometheusOperator:
       memory: 100Mi
 
 
-# ============================================================================
-# Default Alerting Rules
-# ============================================================================
 defaultRules:
   create: true
   labels:
     environment: staging
     cluster: staging
 
-# ============================================================================
-# Component Scraping
-# ============================================================================
+
 kubeApiServer:
   enabled: true
 
@@ -261,9 +227,7 @@ kubeScheduler:
 kubeProxy:
   enabled: false
 
-# ============================================================================
-# Global settings
-# ============================================================================
+
 global:
   rbac:
     create: true

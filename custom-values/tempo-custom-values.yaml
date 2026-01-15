@@ -1,0 +1,382 @@
+global:
+  image:
+    registry: docker.io
+  
+  clusterDomain: 'cluster.local'
+  
+reportingEnabled: false
+multitenancyEnabled: false
+
+
+# Tempo image configuration
+tempo:
+  image:
+    registry: docker.io
+    repository: grafana/tempo
+    tag: null  # Use chart appVersion
+    pullPolicy: IfNotPresent
+  
+  
+  structuredConfig:
+    server:
+      http_listen_port: 3200
+      grpc_listen_port: 9095
+      log_level: info
+      log_format: logfmt
+      grpc_server_max_recv_msg_size: 4194304
+      grpc_server_max_send_msg_size: 4194304
+    
+    distributor:
+      receivers:
+        otlp:
+          protocols:
+            grpc:
+              endpoint: 0.0.0.0:4317
+            http:
+              endpoint: 0.0.0.0:4318
+
+      
+      log_received_spans:
+        enabled: false
+      
+      ring:
+        kvstore:
+          store: memberlist
+    
+    ingester:
+      trace_idle_period: 10s
+      max_block_duration: 30m
+      max_block_bytes: 524288000  
+      flush_check_period: 10s
+      complete_block_timeout: 15m
+      
+      lifecycler:
+        ring:
+          kvstore:
+            store: memberlist
+          replication_factor: 1
+        tokens_file_path: /var/tempo/tokens.json
+        final_sleep: 0s
+    
+    querier:
+      max_concurrent_queries: 20
+      
+      frontend_worker:
+        frontend_address: "" 
+        grpc_client_config:
+          max_send_msg_size: 16777216
+      
+      search:
+        external_hedge_requests_at: 8s
+        external_hedge_requests_up_to: 2
+        prefer_self: 10
+    
+    query_frontend:
+      search:
+        max_duration: 0
+        default_result_limit: 20
+        max_result_limit: 10000
+        query_shards: 50
+        target_bytes_per_shard: 5242880  
+      
+      trace_by_id:
+        hedge_requests_at: 2s
+        hedge_requests_up_to: 2
+        query_shards: 50
+      
+      metrics:
+        duration_slo: 5s
+        throughput_bytes_slo: 100000000  
+    
+    compactor:
+      compaction:
+        compaction_window: 1h
+        max_compaction_range: 24h
+        block_retention: 336h  
+        compacted_block_retention: 1h
+        max_block_bytes: 107374182400  
+        max_time_per_tenant: 5m
+        retention_concurrency: 10
+        v2_in_buffer_bytes: 5242880
+        v2_out_buffer_bytes: 20971520
+        v2_prefetch_traces_count: 1000
+        v2_enable_compaction: true
+        compaction_cycle: 30s
+    
+
+storage:
+  trace:
+    backend: s3
+    s3:
+      bucket: test-tempo-argo             
+      endpoint: s3.ap-southeast-2.amazonaws.com  
+      region: ap-southeast-2              
+      access_key: ""  
+      secret_key: ""  # Leave empty for IAM roles 
+      insecure: false
+      forcepathstyle: false
+    
+    wal:
+      path: /var/tempo/wal
+    
+    block:
+      version: vParquet4
+      encoding: zstd  
+      bloom_filter_false_positive: 0.01
+      retention: 336h 
+      
+    pool:
+      max_workers: 400
+      queue_depth: 20000
+  
+  # Admin client storage (for Grafana Enterprise Traces only)
+  admin:
+    backend: ""
+    # s3:
+    #   bucket: enterprise-traces-admin
+
+# Cache configuration (optional but recommended for production)
+cache:
+  caches:
+    - memcached:
+        host: memcached
+        service: memcached
+        timeout: 500ms
+      roles:
+        - parquet-footer
+        - bloom
+        - frontend-search
+
+
+distributor:
+  replicas: 1 
+
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0 
+
+  autoscaling:
+    enabled: false
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 60
+
+  service:
+    type: ClusterIP
+    annotations: {}
+    labels: {}
+
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+  
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1  
+
+  # annotations: {}
+  # podLabels: {}
+  # podAnnotations: {}
+  # nodeSelector: {}
+  # tolerations: []
+  # extraEnv: []
+  # extraVolumes: []
+
+
+ingester:
+  replicas: 1
+  
+  autoscaling:
+    enabled: false
+  
+  persistence:
+    enabled: false 
+    size: 10Gi     
+    storageClass: null 
+  
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 4Gi
+    limits:
+      cpu: 2000m
+      memory: 8Gi
+  
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 2
+  
+  terminationGracePeriodSeconds: 300
+  
+  # annotations: {}
+  # podLabels: {}
+  # nodeSelector: {}
+  # tolerations: []
+
+
+querier:
+  replicas: 1 
+ 
+  autoscaling:
+    enabled: false
+    minReplicas: 3
+    maxReplicas: 10
+    behavior: {}
+    targetCPUUtilizationPercentage: 60
+    targetMemoryUtilizationPercentage: null
+  
+  resources:
+    requests:
+      cpu: 500m
+      memory: 2Gi
+    limits:
+      cpu: 1000m
+      memory: 4Gi
+  
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+
+  # service: {}
+  # nodeSelector: {}
+  # tolerations: []
+
+
+queryFrontend:
+  replicas: 1
+  
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 60
+  
+
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+  
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+
+  # Ingress for external access (optional)
+  query:
+    ingress:
+      enabled: false
+  #     enabled: true
+  #     ingressClassName: nginx
+  #     annotations:
+  #       cert-manager.io/cluster-issuer: letsencrypt-prod
+  #     hosts:
+  #       - host: tempo.example.com
+  #         paths:
+  #           - path: /
+  #             pathType: Prefix
+  #     tls:
+  #       - secretName: tempo-tls
+  #         hosts:
+  #           - tempo.example.com
+
+
+compactor:
+  replicas: 1  
+  
+  resources:
+    requests:
+      cpu: 500m
+      memory: 2Gi
+    limits:
+      cpu: 1000m
+      memory: 4Gi
+  
+  podDisruptionBudget:
+    enabled: true
+  
+  # nodeSelector: {}
+  # tolerations: []
+
+
+metricsGenerator:
+  enabled: false
+  replicas: 1
+  
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+  
+  persistence:
+    enabled: false
+    size: 10Gi
+
+
+traces:
+  otlp:
+    grpc:
+      enabled: true
+    http:
+      enabled: true
+
+search:
+  enabled: true
+
+
+serviceAccount:
+  create: false
+  name: "awscli" 
+  
+  annotations: {}
+    # For AWS (IRSA):
+    # eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/tempo-s3-role
+
+
+# rbac:
+#   create: true
+#   pspEnabled: false
+
+metaMonitoring:
+  serviceMonitor:
+    enabled: false  # Set to true if you have Prometheus Operator
+    interval: 30s
+    scrapeTimeout: 10s
+    # Add labels if needed for your Prometheus setup
+    # labels:
+    #   prometheus: kube-prometheus
+
+# Prometheus alerting rules (optional)
+prometheusRule:
+  enabled: false
+  # groups:
+  #   - name: tempo-alerts
+  #     rules:
+  #       - alert: TempoIngesterDown
+  #         expr: up{job="tempo-ingester"} == 0
+  #         for: 5m
+
+# GATEWAY (Optional - Unified Entry Point)
+gateway:
+  # Enable gateway
+  enabled: false
+  # Uncomment and configure if you want a unified nginx gateway
+  # replicas: 1
+  # service:
+  #   type: LoadBalancer
+  # ingress:
+  #   enabled: true
+  #   hosts:
+  #     - host: tempo.example.com
+ 
