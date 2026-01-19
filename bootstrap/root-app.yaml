@@ -24,7 +24,4 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - PruneLast=true
-      - CreateNamespace=true
-
-  # key to delete orphaned resources automatically
-  orphanedResourceStrategy: Delete
+   
