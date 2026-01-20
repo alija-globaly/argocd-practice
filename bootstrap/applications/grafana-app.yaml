@@ -4,7 +4,7 @@ metadata:
   name: grafana
   namespace: argocd
   finalizers:
-    - resources-finalizer.argocd.argoproj.io  
+    - resources-finalizer.argocd.argoproj.io/background 
 spec:
   project: default
 
@@ -30,5 +30,5 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
-      - PrunePropagationPolicy=foreground
       - PruneLast=true  
+      - ServerSideApply=true
