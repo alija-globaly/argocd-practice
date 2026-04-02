@@ -1,0 +1,75 @@
+controller:
+  type: deployment   
+
+alloy:
+  configMap:
+    content: |
+      logging {
+        level  = "info"
+        format = "logfmt"
+      }
+
+      // 1. Discover pods from Kubernetes ONLY in default namespace
+      discovery.kubernetes "app_pods" {
+        role = "pod"
+
+        namespaces {
+          names = ["default", "agentcisapp-web-server"]
+        }
+      }
+
+      // 2. Filter only specific pods + add labels
+      discovery.relabel "pod_logs" {
+        targets = discovery.kubernetes.app_pods.targets
+
+        // Optional: keep only certain pods
+        // rule {
+        //   source_labels = ["__meta_kubernetes_namespace"]
+        //   regex         = "nginx-log-generator-.*|nginx-test-.*"
+        //   action        = "keep"
+        // }
+
+        // Add namespace label
+        rule {
+          source_labels = ["__meta_kubernetes_namespace"]
+          target_label  = "namespace"
+        }
+
+        // Add pod label
+        rule {
+          source_labels = ["__meta_kubernetes_pod_name"]
+          target_label  = "pod"
+        }
+
+        // Add container label
+        rule {
+          source_labels = ["__meta_kubernetes_pod_container_name"]
+          target_label  = "container"
+        }
+      }
+
+      // 3. Read logs from Kubernetes API
+      loki.source.kubernetes "pod_logs" {
+        targets    = discovery.relabel.pod_logs.output
+        forward_to = [loki.process.add_labels.receiver]
+      }
+
+      // 4. Add static labels
+      loki.process "add_labels" {
+        stage.static_labels {
+          values = {
+            job        = "kubernetes-pods",
+            log_source = "k8s-api",
+            env        = "staging",
+          }
+        }
+
+        forward_to = [loki.write.local_loki.receiver]
+      }
+
+      // 5. Send to Loki
+      loki.write "local_loki" {
+        endpoint {
+          url = "http://loki-gateway.monitoring.svc.cluster.local/loki/api/v1/push"
+        }
+      }

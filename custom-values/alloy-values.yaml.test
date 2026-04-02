@@ -1,0 +1,91 @@
+# Grafana Alloy — extend as needed (receivers, pipelines, remote_write, etc.)
+# Chart: https://github.com/grafana/alloy/tree/main/operations/helm/charts/alloy
+
+# controller:
+#   type: daemonset
+
+# alloy:
+#   clustering:
+#     enabled: false
+#   configMap:
+#     content: |
+#       logging {
+#         level  = "info"
+#         format = "logfmt"
+#       }
+
+
+
+controller:
+  type: daemonset
+  
+    
+alloy:
+  #  Mount host logs into the pod
+  extraVolumes:
+    - name: host-logs
+      hostPath:
+        path: /home/ubuntu/argo-project
+        type: Directory
+
+  extraVolumeMounts:
+    - name: host-logs
+      mountPath: /var/log/custom
+      readOnly: true
+
+  #  Main Alloy configuration
+  configMap:
+    content: |
+      logging {
+        level  = "info"
+        format = "logfmt"
+      }
+
+      // =========================
+      //  LOG PIPELINE (LOKI)
+      // =========================
+
+      local.file_match "nginx_logs_file" {
+        path_targets = [
+          { "__path__" = "/var/log/custom/my-nginx-logs.txt", },
+        ]
+        sync_period = "5s"
+      }
+
+      loki.source.file "nginx_logs" {
+        targets    = local.file_match.nginx_logs_file.targets
+        forward_to = [loki.process.nginx_logs.receiver]
+      }
+
+      loki.process "nginx_logs" {
+        stage.static_labels {
+          values = {
+            job        = "nginx-test",
+            log_source = "file",
+            env        = "staging",
+          }
+        }
+
+        forward_to = [loki.write.local_loki.receiver]
+      }
+
+      loki.write "local_loki" {
+        endpoint {
+          url = "http://loki-gateway.monitoring.svc.cluster.local/loki/api/v1/push"
+        }
+      }
+
+
+serviceAccount:
+  create: true
+
+rbac:
+  create: true
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi

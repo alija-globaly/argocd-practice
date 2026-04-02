@@ -1,35 +1,22 @@
 deploymentMode: SimpleScalable
-
-global:
-  clusterDomain: cluster.local
-  # Must match the DNS Service name in kube-system
-  dnsService: coredns
-  dnsNamespace: kube-system
-
 loki:
   auth_enabled: false
    
-  enterprise:
-    enabled: false
-
-
   commonConfig:
-    replication_factor: 1
+    replication_factor: 2
     
   storage:
     type: s3
     bucketNames:
-      chunks: "loki-chunk-testing"
+      chunks: "loki-chunk-argo"   # main S3 bucket
       # ruler: ""                 # optional, only if using ruler
-      # admin: ""       
+      # admin: ""                 # optional    
     s3:
-      region: "ap-southeast-2"         
-      s3ForcePathStyle: false
-      insecure: false
-      # Add this to ensure it uses the IAM profile correctly
-      http_config:
-        idle_conn_timeout: 90s
-
+      endpoint: s3.ap-southeast-2.amazonaws.com
+      region: ""         
+      s3ForcePathStyle: true
+      insecure: false    
+      
       
   schemaConfig:
     configs:
@@ -65,10 +52,8 @@ loki:
     delete_request_store: s3
 
 serviceAccount:
-  create: true
-  name: lokiuser
-  annotations:
-    eks.amazonaws.com/role-arn: arn:aws:iam::834033184010:role/Testing-testing-K8s-EC2-IRSA-role
+  create: false      # we created it manually
+  name: awscli    
 
 memberlist:
   joinMembers: [] 
@@ -133,27 +118,9 @@ backend:
     enabled: false
 
 gateway:
-  affinity:
-    podAntiAffinity:
-      preferredDuringSchedulingIgnoredDuringExecution:
-        - weight: 100
-          podAffinityTerm:
-            topologyKey: kubernetes.io/hostname
-            labelSelector:
-              matchLabels:
-                app.kubernetes.io/name: loki
-                app.kubernetes.io/instance: loki
-                app.kubernetes.io/component: gateway
-  deploymentStrategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxSurge: 0
-      maxUnavailable: 1
-
-  # nginxConfig:
-  #     resolver: "10.152.183.184"
-  
-# basicAuth:
+  nginxConfig:
+    resolver: "10.152.183.64"  # ClusterIP of CoreDNS in the cluster
+  # basicAuth:
   #   enabled: true
   #   username: "loki-user"
   #   password: "secure-password"  # Should use a secret
@@ -164,16 +131,16 @@ gateway:
   resources:
     requests:
       cpu: 50m
-      memory: 54Mi
+      memory: 64Mi
     limits:
       cpu: 200m
-      memory: 100Mi
+      memory: 128Mi
 
 monitoring:
   selfMonitoring:
     enabled: false
     grafanaAgent:
-      installOperator: false
+      installOperator: true
   
   lokiCanary:
     enabled: false
@@ -202,6 +169,14 @@ resultsCache:
 chunksCache:
   enabled: false
 
-
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          topologyKey: kubernetes.io/hostname
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: loki
 tolerations: []
               
